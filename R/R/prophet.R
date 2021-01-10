@@ -80,6 +80,7 @@ globalVariables(c(
 #' @importFrom dplyr "%>%"
 #' @import Rcpp
 #' @import rlang
+#' @import RcppParallel
 #' @useDynLib prophet, .registration = TRUE
 prophet <- function(df = NULL,
                     growth = 'linear',
