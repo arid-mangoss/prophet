@@ -79,8 +79,8 @@ globalVariables(c(
 #' @export
 #' @importFrom dplyr "%>%"
 #' @import Rcpp
+#' @rawNamespace import(RcppParallel, except = LdFlags)
 #' @import rlang
-#' @import RcppParallel
 #' @useDynLib prophet, .registration = TRUE
 prophet <- function(df = NULL,
                     growth = 'linear',
