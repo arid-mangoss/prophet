@@ -1273,7 +1273,7 @@ fit.prophet <- function(m, df, ...) {
 
 #' Predict using the prophet model.
 #'
-#' @param object Prophet object.
+#' @param m Prophet object.
 #' @param df Dataframe with dates for predictions (column ds), and capacity
 #'  (column cap) if logistic growth. If not provided, predictions are made on
 #'  the history.
@@ -1292,24 +1292,24 @@ fit.prophet <- function(m, df, ...) {
 #' }
 #'
 #' @export
-predict.prophet <- function(object, df = NULL, ...) {
-  if (is.null(object$history)) {
+predict.prophet <- function(m, df = NULL, ...) {
+  if (is.null(m$history)) {
     stop("Model must be fit before predictions can be made.")
   }
   if (is.null(df)) {
-    df <- object$history
+    df <- m$history
   } else {
     if (nrow(df) == 0) {
       stop("Dataframe has no rows.")
     }
-    out <- setup_dataframe(object, df)
+    out <- setup_dataframe(m, df)
     df <- out$df
   }
 
-  df$trend <- predict_trend(object, df)
-  seasonal.components <- predict_seasonal_components(object, df)
-  if (object$uncertainty.samples) {
-    intervals <- predict_uncertainty(object, df)
+  df$trend <- predict_trend(m, df)
+  seasonal.components <- predict_seasonal_components(m, df)
+  if (m$uncertainty.samples) {
+    intervals <- predict_uncertainty(m, df)
   } else {
     intervals <- NULL
     }
@@ -1319,7 +1319,7 @@ predict.prophet <- function(object, df = NULL, ...) {
   if ('cap' %in% colnames(df)) {
     cols <- c(cols, 'cap')
   }
-  if (object$logistic.floor) {
+  if (m$logistic.floor) {
     cols <- c(cols, 'floor')
   }
   df <- df[cols]
@@ -1589,24 +1589,24 @@ sample_model <- function(m, df, seasonal.features, iteration, s_a, s_m) {
 
 #' Simulate the trend using the extrapolated generative model.
 #'
-#' @param model Prophet object.
+#' @param m Prophet object.
 #' @param df Prediction dataframe.
 #' @param iteration Int sampling iteration to use parameters from.
 #'
 #' @return Vector of simulated trend over df$t.
 #'
 #' @keywords internal
-sample_predictive_trend <- function(model, df, iteration) {
-  k <- model$params$k[iteration]
-  param.m <- model$params$m[iteration]
-  deltas <- model$params$delta[iteration,]
+sample_predictive_trend <- function(m, df, iteration) {
+  k <- m$params$k[iteration]
+  param.m <- m$params$m[iteration]
+  deltas <- m$params$delta[iteration,]
 
   t <- df$t
   T <- max(t)
 
   # New changepoints from a Poisson process with rate S on [1, T]
   if (T > 1) {
-    S <- length(model$changepoints.t)
+    S <- length(m$changepoints.t)
     n.changes <- stats::rpois(1, S * (T - 1))
   } else {
     n.changes <- 0
@@ -1624,22 +1624,22 @@ sample_predictive_trend <- function(model, df, iteration) {
   deltas.new <- extraDistr::rlaplace(n.changes, mu = 0, sigma = lambda)
 
   # Combine with changepoints from the history
-  changepoint.ts <- c(model$changepoints.t, changepoint.ts.new)
+  changepoint.ts <- c(m$changepoints.t, changepoint.ts.new)
   deltas <- c(deltas, deltas.new)
 
   # Get the corresponding trend
-  if (model$growth == 'linear') {
+  if (m$growth == 'linear') {
     trend <- piecewise_linear(t, deltas, k, param.m, changepoint.ts)
   } else {
     cap <- df$cap_scaled
     trend <- piecewise_logistic(t, cap, deltas, k, param.m, changepoint.ts)
   }
-  return(trend * model$y.scale + df$floor)
+  return(trend * m$y.scale + df$floor)
 }
 
 #' Make dataframe with future dates for forecasting.
 #'
-#' @param m Prophet model object.
+#' @param m Prophet object.
 #' @param periods Int number of periods to forecast forward.
 #' @param freq 'day', 'week', 'month', 'quarter', 'year', 1(1 sec), 60(1 minute) or 3600(1 hour).
 #' @param include_history Boolean to include the historical dates in the data
