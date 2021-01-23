@@ -136,7 +136,8 @@ prophet <- function(df = NULL,
     train.holiday.names = NULL,
     train.component.cols = NULL,
     component.modes = NULL,
-    fit.kwargs = list()
+    fit.kwargs = list(),
+    timezone = 'GMT'
   )
   m <- validate_inputs(m)
   class(m) <- append("prophet", class(m))
@@ -261,7 +262,7 @@ set_date <- function(ds = NULL, tz = "GMT") {
   } else {
     ds <- as.POSIXct(ds, format = "%Y-%m-%d %H:%M:%S", tz = tz)
   }
-  attr(ds, "tzone") <- tz
+
   return(ds)
 }
 
@@ -301,7 +302,13 @@ setup_dataframe <- function(m, df, initialize_scales = FALSE) {
       stop("Found infinity in column y.")
     }
   }
-  df$ds <- set_date(df$ds)
+
+  df_tz <- attr(df$ds, 'tzone')
+  if (!is.null(df_tz) && df_tz != m$timezone) {
+    message('Converting prediction dataframe timezone to: ', m$timezone)
+  }
+
+  df$ds <- set_date(df$ds, tz = m$timezone)
   if (anyNA(df$ds)) {
     stop(paste('Unable to parse date format in column ds. Convert to date ',
                'format (%Y-%m-%d or %Y-%m-%d %H:%M:%S) and check that there',
@@ -433,7 +440,7 @@ initialize_scales_fn <- function(m, initialize_scales, df) {
 set_changepoints <- function(m) {
   if (!is.null(m$changepoints)) {
     if (length(m$changepoints) > 0) {
-      m$changepoints <- set_date(m$changepoints)
+      m$changepoints <- set_date(m$changepoints, tz = m$timezone)
       if (min(m$changepoints) < min(m$history$ds)
           || max(m$changepoints) > max(m$history$ds)) {
         stop('Changepoints must fall within training data.')
@@ -475,7 +482,7 @@ set_changepoints <- function(m) {
 #'
 #' @keywords internal
 fourier_series <- function(dates, period, series.order) {
-  t <- time_diff(dates, set_date('1970-01-01 00:00:00'))
+  t <- time_diff(dates, set_date('1970-01-01 00:00:00')) # can use the default timezone (GMT)
   features <- matrix(0, length(t), 2 * series.order)
   for (i in 1:series.order) {
     x <- as.numeric(2 * i * pi * t / period)
@@ -550,9 +557,9 @@ construct_holiday_dataframe <- function(m, dates) {
 #' @keywords internal
 make_holiday_features <- function(m, dates, holidays) {
   # Strip dates to be just days, for joining on holidays
-  dates <- set_date(format(dates, "%Y-%m-%d"))
+  dates <- set_date(format(dates, "%Y-%m-%d"), tz = m$timezone)
   wide <- holidays %>%
-    dplyr::mutate(ds = set_date(ds)) %>%
+    dplyr::mutate(ds = set_date(ds, tz = m$timezone)) %>%
     dplyr::group_by(holiday, ds) %>%
     dplyr::filter(dplyr::row_number() == 1) %>%
     dplyr::do({
@@ -569,7 +576,7 @@ make_holiday_features <- function(m, dates, holidays) {
     dplyr::mutate(x = 1.) %>%
     tidyr::spread(holiday, x, fill = 0)
 
-  holiday.features <- data.frame(ds = set_date(dates)) %>%
+  holiday.features <- data.frame(ds = set_date(dates, tz = m$timezone)) %>%
     dplyr::left_join(wide, by = 'ds') %>%
     dplyr::select(-ds)
   # Make sure column order is consistent
@@ -1143,12 +1150,15 @@ fit.prophet <- function(m, df, ...) {
       "respectively."
     ))
   }
+
+  m <- setup_timezone(m, df)
+
   history <- df %>%
     dplyr::filter(!is.na(y))
   if (nrow(history) < 2) {
     stop("Dataframe has less than 2 non-NA rows.")
   }
-  m$history.dates <- sort(set_date(unique(df$ds)))
+  m$history.dates <- sort(set_date(unique(df$ds), tz = m$timezone))
 
   out <- setup_dataframe(m, history, initialize_scales = TRUE)
   history <- out$df
@@ -1316,6 +1326,34 @@ predict.prophet <- function(object, df = NULL, ...) {
   df <- dplyr::bind_cols(df, seasonal.components, intervals)
   df$yhat <- df$trend * (1 + df$multiplicative_terms) + df$additive_terms
   return(df)
+}
+
+#' Sets the timezone environment variable to the timezone of the system.
+#' Defaults to 'GMT' if there is no valid system timezone in the data or 
+#' the system.
+#' 
+#' @param m Prophet model.
+#' 
+#' @param df Dataframe containing the history.
+#'
+#' @keywords internal
+setup_timezone <- function(m, df) {
+  df_tz <- attr(df$ds, 'tzone')
+  system_tz <- Sys.timezone()
+  
+  if (!is.null(df_tz)) {
+    TZ <- df_tz
+  } 
+  else if (system_tz %in% OlsonNames()) {
+    TZ <- system_tz
+  } 
+  else {
+    message('The system timezone is not valid, defaulting to GMT')
+    TZ <- 'GMT'
+  }
+  
+  m$timezone <- TZ
+  return(m)
 }
 
 #' Evaluate the piecewise linear function.
@@ -1624,7 +1662,7 @@ make_future_dataframe <- function(m, periods, freq = 'day',
   dates <- dates[2:(periods + 1)]  # Drop the first, which is max(history$ds)
   if (include_history) {
     dates <- c(m$history.dates, dates)
-    attr(dates, "tzone") <- "GMT"
   }
+  dates <- set_date(dates, tz = m$timezone)
   return(data.frame(ds = dates))
 }
