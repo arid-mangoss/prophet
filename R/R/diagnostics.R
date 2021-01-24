@@ -60,7 +60,7 @@ generate_cutoffs <- function(df, horizon, initial, period) {
 #' When period is equal to the time interval of the data, this is the
 #' technique described in https://robjhyndman.com/hyndsight/tscv/ .
 #'
-#' @param model Fitted Prophet model.
+#' @param m Fitted Prophet model.
 #' @param horizon Integer size of the horizon
 #' @param units String unit of the horizon, e.g., "days", "secs".
 #' @param period Integer amount of time between cutoff dates. Same units as
@@ -76,17 +76,17 @@ generate_cutoffs <- function(df, horizon, initial, period) {
 #'
 #' @export
 cross_validation <- function(
-    model, horizon, units, period = NULL, initial = NULL, cutoffs=NULL) {
-  df <- model$history
+    m, horizon, units, period = NULL, initial = NULL, cutoffs=NULL) {
+  df <- m$history
   horizon.dt <- as.difftime(horizon, units = units)
 
   predict_columns <- c('ds', 'yhat')
-  if (model$uncertainty.samples){
+  if (m$uncertainty.samples){
     predict_columns <- append(predict_columns, c('yhat_lower', 'yhat_upper'))
   }
   # Identify largest seasonality period
   period.max <- 0
-  for (s in model$seasonalities) {
+  for (s in m$seasonalities) {
     period.max <- max(period.max, s$period)
   }
   seasonality.dt <- as.difftime(period.max, units = 'days')
@@ -109,7 +109,7 @@ cross_validation <- function(
     }
     cutoffs <- generate_cutoffs(df, horizon.dt, initial.dt, period.dt)
   }else{
-    cutoffs <- set_date(ds=cutoffs)
+    cutoffs <- set_date(ds=cutoffs, tz=m$timezone)
     initial.dt <- cutoffs[1] - min(df$ds)
   }
 
@@ -125,13 +125,13 @@ cross_validation <- function(
   for (i in 1:length(cutoffs)) {
     # Copy the model
     cutoff <- cutoffs[i]
-    m <- prophet_copy(model, cutoff)
+    m <- prophet_copy(m, cutoff)
     # Train model
     history.c <- dplyr::filter(df, ds <= cutoff)
     if (nrow(history.c) < 2) {
       stop('Less than two datapoints before cutoff. Increase initial window.')
     }
-    fit.args <- c(list(m=m, df=history.c), model$fit.kwargs)
+    fit.args <- c(list(m=m, df=history.c), m$fit.kwargs)
     m <- do.call(fit.prophet, fit.args)
     # Calculate yhat
     df.predict <- dplyr::filter(df, ds > cutoff, ds <= cutoff + horizon.dt)
@@ -180,7 +180,7 @@ prophet_copy <- function(m, cutoff = NULL) {
   if (m$specified.changepoints) {
     changepoints <- m$changepoints
     if (!is.null(cutoff)) {
-      cutoff <- set_date(cutoff)
+      cutoff <- set_date(cutoff, tz = m$timezone)
       last_history_date <- max(m$history$ds[m$history$ds <= cutoff])
       changepoints <- changepoints[changepoints < last_history_date]
     }
@@ -205,11 +205,12 @@ prophet_copy <- function(m, cutoff = NULL) {
     mcmc.samples = m$mcmc.samples,
     interval.width = m$interval.width,
     uncertainty.samples = m$uncertainty.samples,
-    fit = FALSE
+    fit = FALSE, 
   )
   m2$extra_regressors <- m$extra_regressors
   m2$seasonalities <- m$seasonalities
   m2$country_holidays <- m$country_holidays
+  m2$timezone = m$timezone
   return(m2)
 }
 
