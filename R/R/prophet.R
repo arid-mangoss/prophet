@@ -254,8 +254,15 @@ set_date <- function(ds = NULL, tz = "GMT") {
     return(NULL)
   }
 
+  # shift ds time to tz timezone
+  current_tz <- attr(ds, 'tzone')
+  if (!is.null(current_tz) && current_tz %in% OlsonNames()) {
+    attr(ds, 'tzone') <- tz
+  }
+
   ds <- as.character(ds)
 
+  # set ds to datetime with tz 
   if (min(nchar(ds), na.rm=TRUE) < 12) {
     ds <- as.POSIXct(ds, format = "%Y-%m-%d", tz = tz)
   } else {
