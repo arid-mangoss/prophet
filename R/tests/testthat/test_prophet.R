@@ -801,7 +801,7 @@ test_that('timezone is handled correctly with using `make_future_dataframe()`', 
   future_tz <- attr(future$ds, 'tzone')
   fcst_tz <- attr(fcst$ds, 'tzone')
 
-  expect_equal(train_tz, Sys.timezone()) 
+  expect_equal(train_tz, NULL) 
   expect_equal(future_tz, Sys.timezone()) 
   expect_equal(fcst_tz, Sys.timezone()) 
 
@@ -843,15 +843,20 @@ test_that('timezone is handled correctly without using `make_future_dataframe()`
   expect_equal(future_tz, Sys.timezone()) 
 
   # if there is a timezone in the training data
-  # then expect the returned forecast to have that timezone
+  # then expect the returned forecast to have the 
+  # training timezone (shifted from original timezone)
   attr(df_train$ds, 'tzone') <- 'EST'
-  attr(df_future$ds, 'tzone') <- 'Turkey'
-  starting_tz <- attr(df_train$ds, 'tzone')
+  attr(df_future$ds, 'tzone') <- 'GMT'
 
   m <- prophet(df_train)
   fcst <- predict(m, df_future)
 
+  starting_tz <- attr(df_train$ds, 'tzone')
   future_tz <- attr(fcst$ds, 'tzone')
-  expect_equal(future_tz, starting_tz)
+  expect_equal(starting_tz, 'EST')
+  expect_equal(future_tz, 'EST')
+
+  deltas <- prophet:::time_diff(fcst$ds, df_future$ds)
+  expect_equal(sum(deltas), 0)
 })
 
