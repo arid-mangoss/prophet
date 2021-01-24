@@ -763,3 +763,78 @@ test_that("seasonality_modes", {
       'numeric_feature', 'weekly', 'xmas', 'yearly')
   )
 })
+
+test_that('timezone is handled correctly with using `make_future_dataframe()`', {
+  skip_if_not(Sys.getenv('R_ARCH') != '/i386')
+  df_train <- train
+
+  # initial timezone should be null 
+  # because the `ds` column is of type character
+  starting_tz <- attr(df_train$ds, 'tzone')
+  expect_equal(starting_tz, NULL) 
+
+  # if there is no timezone in the training data 
+  # then expect the system timezone in the returned forecast
+  # and the future dataframe
+  m <- prophet(df_train)
+  future <- make_future_dataframe(m, periods = 100)
+  fcst <- predict(m, future)
+
+  train_tz <- attr(df_train$ds, 'tzone')
+  future_tz <- attr(future$ds, 'tzone')
+  fcst_tz <- attr(fcst$ds, 'tzone')
+
+  expect_equal(train_tz, Sys.timezone()) 
+  expect_equal(future_tz, Sys.timezone()) 
+  expect_equal(fcst_tz, Sys.timezone()) 
+
+  # if there is a timezone in the training data
+  # then expect the returned forecast and future dataframe
+  # to have that timezone
+  attr(df_train$ds, 'tzone') <- 'EST'
+  m <- prophet(df_train)
+  future <- make_future_dataframe(m, periods = 100)
+  fcst <- predict(m, future)
+
+  train_tz <- attr(df_train$ds, 'tzone')
+  future_tz <- attr(future$ds, 'tzone')
+  fcst_tz <- attr(fcst$ds, 'tzone')
+
+  expect_equal(train_tz, 'EST') 
+  expect_equal(future_tz, 'EST') 
+  expect_equal(fcst_tz, 'EST') 
+})
+
+test_that('timezone is handled correctly without using `make_future_dataframe()`', {
+  skip_if_not(Sys.getenv('R_ARCH') != '/i386')
+  df_train <- train
+  df_future <- future
+
+  # initial timezones should be null 
+  # because the `ds` column is of type character
+  starting_tz <- attr(df_train$ds, 'tzone')
+  future_tz <- attr(df_future$ds, 'tzone')
+  expect_equal(starting_tz, NULL) 
+  expect_equal(future_tz, NULL)
+
+  # if there is no timezone in the training data 
+  # then expect the system timezone in the returned forecast
+  m <- prophet(df_train)
+  fcst <- predict(m, df_future)
+
+  future_tz <- attr(fcst$ds, 'tzone')
+  expect_equal(future_tz, Sys.timezone()) 
+
+  # if there is a timezone in the training data
+  # then expect the returned forecast to have that timezone
+  attr(df_train$ds, 'tzone') <- 'EST'
+  attr(df_future$ds, 'tzone') <- 'Turkey'
+  starting_tz <- attr(df_train$ds, 'tzone')
+
+  m <- prophet(df_train)
+  fcst <- predict(m, df_future)
+
+  future_tz <- attr(fcst$ds, 'tzone')
+  expect_equal(future_tz, starting_tz)
+})
+
