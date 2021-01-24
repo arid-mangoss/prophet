@@ -254,9 +254,7 @@ set_date <- function(ds = NULL, tz = "GMT") {
     return(NULL)
   }
 
-  if (is.factor(ds)) {
-    ds <- as.character(ds)
-  }
+  ds <- as.character(ds)
 
   if (min(nchar(ds), na.rm=TRUE) < 12) {
     ds <- as.POSIXct(ds, format = "%Y-%m-%d", tz = tz)
@@ -1367,18 +1365,18 @@ setup_timezone <- function(m, df) {
   df_tz <- attr(df$ds, 'tzone')
   system_tz <- Sys.timezone()
   
-  if (!is.null(df_tz)) {
-    TZ <- df_tz
+  if (!is.null(df_tz) && df_tz != '') {
+    timezone <- df_tz
   } 
   else if (system_tz %in% OlsonNames()) {
-    TZ <- system_tz
+    timezone <- system_tz
   } 
   else {
     message('The system timezone is not valid, defaulting to GMT')
-    TZ <- 'GMT'
+    timezone <- 'GMT'
   }
   
-  m$timezone <- TZ
+  m$timezone <- timezone
   return(m)
 }
 
