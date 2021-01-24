@@ -1365,10 +1365,10 @@ setup_timezone <- function(m, df) {
   df_tz <- attr(df$ds, 'tzone')
   system_tz <- Sys.timezone()
   
-  if (!is.null(df_tz) && df_tz != '') {
+  if (!is.null(df_tz) && df_tz %in% OlsonNames()) {
     timezone <- df_tz
   } 
-  else if (system_tz %in% OlsonNames()) {
+  else if (!is.null(system_tz) && system_tz %in% OlsonNames()) {
     timezone <- system_tz
   } 
   else {
