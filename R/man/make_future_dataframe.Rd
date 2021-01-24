@@ -7,7 +7,7 @@
 make_future_dataframe(m, periods, freq = "day", include_history = TRUE)
 }
 \arguments{
-\item{m}{Prophet model object.}
+\item{m}{Prophet object.}
 
 \item{periods}{Int number of periods to forecast forward.}
 

@@ -4,10 +4,10 @@
 \alias{predict.prophet}
 \title{Predict using the prophet model.}
 \usage{
-\method{predict}{prophet}(object, df = NULL, ...)
+\method{predict}{prophet}(m, df = NULL, ...)
 }
 \arguments{
-\item{object}{Prophet object.}
+\item{m}{Prophet object.}
 
 \item{df}{Dataframe with dates for predictions (column ds), and capacity
 (column cap) if logistic growth. If not provided, predictions are made on

@@ -4,10 +4,10 @@
 \alias{sample_predictive_trend}
 \title{Simulate the trend using the extrapolated generative model.}
 \usage{
-sample_predictive_trend(model, df, iteration)
+sample_predictive_trend(m, df, iteration)
 }
 \arguments{
-\item{model}{Prophet object.}
+\item{m}{Prophet object.}
 
 \item{df}{Prediction dataframe.}
 

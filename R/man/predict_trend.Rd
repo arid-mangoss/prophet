@@ -4,10 +4,10 @@
 \alias{predict_trend}
 \title{Predict trend using the prophet model.}
 \usage{
-predict_trend(model, df)
+predict_trend(m, df)
 }
 \arguments{
-\item{model}{Prophet object.}
+\item{m}{Prophet object.}
 
 \item{df}{Prediction dataframe.}
 }

@@ -5,7 +5,7 @@
 \title{Cross-validation for time series.}
 \usage{
 cross_validation(
-  model,
+  m,
   horizon,
   units,
   period = NULL,
@@ -14,7 +14,7 @@ cross_validation(
 )
 }
 \arguments{
-\item{model}{Fitted Prophet model.}
+\item{m}{Fitted Prophet model.}
 
 \item{horizon}{Integer size of the horizon}
 
