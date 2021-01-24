@@ -1456,28 +1456,28 @@ piecewise_logistic <- function(t, cap, deltas, k, m, changepoint.ts) {
 
 #' Predict trend using the prophet model.
 #'
-#' @param model Prophet object.
+#' @param m Prophet object.
 #' @param df Prediction dataframe.
 #'
 #' @return Vector with trend on prediction dates.
 #'
 #' @keywords internal
-predict_trend <- function(model, df) {
-  k <- mean(model$params$k, na.rm = TRUE)
-  param.m <- mean(model$params$m, na.rm = TRUE)
-  deltas <- colMeans(model$params$delta, na.rm = TRUE)
+predict_trend <- function(m, df) {
+  k <- mean(m$params$k, na.rm = TRUE)
+  param.m <- mean(m$params$m, na.rm = TRUE)
+  deltas <- colMeans(m$params$delta, na.rm = TRUE)
 
   t <- df$t
-  if (model$growth == 'linear') {
-    trend <- piecewise_linear(t, deltas, k, param.m, model$changepoints.t)
-  } else if (model$growth == 'flat') {
+  if (m$growth == 'linear') {
+    trend <- piecewise_linear(t, deltas, k, param.m, m$changepoints.t)
+  } else if (m$growth == 'flat') {
      trend <- flat_trend(t, param.m)
-  } else if (model$growth == 'logistic') {
+  } else if (m$growth == 'logistic') {
     cap <- df$cap_scaled
     trend <- piecewise_logistic(
-      t, cap, deltas, k, param.m, model$changepoints.t)
+      t, cap, deltas, k, param.m, m$changepoints.t)
   }
-  return(trend * model$y.scale + df$floor)
+  return(trend * m$y.scale + df$floor)
 }
 
 #' Predict seasonality components, holidays, and added regressors.
@@ -1672,9 +1672,9 @@ sample_predictive_trend <- function(m, df, iteration) {
   # Get the corresponding trend
   if (m$growth == 'linear') {
     trend <- piecewise_linear(t, deltas, k, param.m, changepoint.ts)
-  } else if (model$growth == 'flat') {
+  } else if (m$growth == 'flat') {
     trend <- flat_trend(t, param.m)
-  } else if (model$growth == 'logistic') {
+  } else if (m$growth == 'logistic') {
     cap <- df$cap_scaled
     trend <- piecewise_logistic(t, cap, deltas, k, param.m, changepoint.ts)
   }
