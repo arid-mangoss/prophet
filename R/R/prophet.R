@@ -20,8 +20,8 @@ globalVariables(c(
 #'  also have a column cap that specifies the capacity at each ds. If not
 #'  provided, then the model object will be instantiated but not fit; use
 #'  fit.prophet(m, df) to fit the model.
-#' @param growth String 'linear' or 'logistic' to specify a linear or logistic
-#'  trend.
+#' @param growth String 'linear', 'logistic', or 'flat' to specify a linear, logistic
+#'  or flat trend.
 #' @param changepoints Vector of dates at which to include potential
 #'  changepoints. If not specified, potential changepoints are selected
 #'  automatically.
@@ -79,6 +79,7 @@ globalVariables(c(
 #' @export
 #' @importFrom dplyr "%>%"
 #' @import Rcpp
+#' @rawNamespace import(RcppParallel, except = LdFlags)
 #' @import rlang
 #' @useDynLib prophet, .registration = TRUE
 prophet <- function(df = NULL,
@@ -155,8 +156,8 @@ prophet <- function(df = NULL,
 #'
 #' @keywords internal
 validate_inputs <- function(m) {
-  if (!(m$growth %in% c('linear', 'logistic'))) {
-    stop("Parameter 'growth' should be 'linear' or 'logistic'.")
+  if (!(m$growth %in% c('linear', 'logistic', 'flat'))) {
+    stop("Parameter 'growth' should be 'linear', 'logistic', or 'flat'.")
   }
   if ((m$changepoint.range < 0) | (m$changepoint.range > 1)) {
     stop("Parameter 'changepoint.range' must be in [0, 1]")
@@ -1060,7 +1061,28 @@ set_auto_seasonalities <- function(m) {
   return(m)
 }
 
-#' Initialize linear growth.
+#' Initialize flat growth.
+#'
+#' Provides a strong initialization for flat growth by setting the
+#' growth to 0 and calculates the offset parameter that pass the 
+#' function through the mean of the the y_scaled values.
+#'
+#' @param df Data frame with columns ds (date), y_scaled (scaled time series),
+#'  and t (scaled time).
+#'
+#' @return A vector (k, m) with the rate (k) and offset (m) of the flat
+#'  growth function.
+#'
+#' @keywords internal
+flat_growth_init <- function(df) {
+  # Initialize the rate
+  k <- 0
+  # And the offset
+  m <- mean(df$y_scaled)
+  return(c(k, m))
+}
+
+#' Initialize constant growth.
 #'
 #' Provides a strong initialization for linear growth by calculating the
 #' growth and offset parameters that pass the function through the first and
@@ -1187,7 +1209,7 @@ fit.prophet <- function(m, df, ...) {
     X = as.matrix(seasonal.features),
     sigmas = array(prior.scales),
     tau = m$changepoint.prior.scale,
-    trend_indicator = as.numeric(m$growth == 'logistic'),
+    trend_indicator = switch(m$growth, 'linear'=0, 'logistic'=1, 'flat'=2),
     s_a = array(component.cols$additive_terms),
     s_m = array(component.cols$multiplicative_terms)
   )
@@ -1196,7 +1218,10 @@ fit.prophet <- function(m, df, ...) {
   if (m$growth == 'linear') {
     dat$cap <- rep(0, nrow(history))  # Unused inside Stan
     kinit <- linear_growth_init(history)
-  } else {
+  } else if (m$growth == 'flat') {
+    dat$cap <- rep(0, nrow(history)) # Unused inside Stan
+    kinit <- flat_growth_init(history)
+  } else if (m$growth == 'logistic') {
     dat$cap <- history$cap_scaled  # Add capacities to the Stan data
     kinit <- logistic_growth_init(history)
   }
@@ -1216,7 +1241,8 @@ fit.prophet <- function(m, df, ...) {
     )
   }
 
-  if (min(history$y) == max(history$y)) {
+  if (min(history$y) == max(history$y) & 
+        (m$growth %in% c('linear', 'flat'))) {
     # Nothing to fit.
     m$params <- stan_init()
     m$params$sigma_obs <- 0.
@@ -1356,6 +1382,20 @@ setup_timezone <- function(m, df) {
   return(m)
 }
 
+
+#' Evaluate the flat trend function.
+#'
+#' @param t Vector of times on which the function is evaluated.
+#' @param m Float initial offset.
+#'
+#' @return Vector y(t).
+#'
+#' @keywords internal
+flat_trend <- function(t, m) {
+  y <- rep(m, length(t))
+  return(y)
+}
+
 #' Evaluate the piecewise linear function.
 #'
 #' @param t Vector of times on which the function is evaluated.
@@ -1430,7 +1470,9 @@ predict_trend <- function(model, df) {
   t <- df$t
   if (model$growth == 'linear') {
     trend <- piecewise_linear(t, deltas, k, param.m, model$changepoints.t)
-  } else {
+  } else if (model$growth == 'flat') {
+     trend <- flat_trend(t, param.m)
+  } else if (model$growth == 'logistic') {
     cap <- df$cap_scaled
     trend <- piecewise_logistic(
       t, cap, deltas, k, param.m, model$changepoints.t)
@@ -1630,7 +1672,9 @@ sample_predictive_trend <- function(m, df, iteration) {
   # Get the corresponding trend
   if (m$growth == 'linear') {
     trend <- piecewise_linear(t, deltas, k, param.m, changepoint.ts)
-  } else {
+  } else if (model$growth == 'flat') {
+    trend <- flat_trend(t, param.m)
+  } else if (model$growth == 'logistic') {
     cap <- df$cap_scaled
     trend <- piecewise_logistic(t, cap, deltas, k, param.m, changepoint.ts)
   }
