@@ -305,7 +305,7 @@ setup_dataframe <- function(m, df, initialize_scales = FALSE) {
 
   df_tz <- attr(df$ds, 'tzone')
   if (!is.null(df_tz) && df_tz != m$timezone) {
-    message('Converting prediction dataframe timezone to: ', m$timezone)
+    message('Converting dataframe timezone to: ', m$timezone)
   }
 
   df$ds <- set_date(df$ds, tz = m$timezone)
